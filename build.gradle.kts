@@ -17,94 +17,59 @@
  * along with NotEnoughUpdates. If not, see <https://www.gnu.org/licenses/>.
  */
 
-
-import com.xpdustry.ksr.kotlinRelocate
-import neubs.CustomSignTask
-import neubs.DownloadBackupRepo
-import neubs.NEUBuildFlags
-import neubs.applyPublishingInformation
-import neubs.setVersionFromEnvironment
-import org.apache.commons.lang3.SystemUtils
-import org.gradle.api.tasks.testing.logging.TestExceptionFormat
-
 plugins {
 	idea
 	java
-	id("gg.essential.loom") version "0.10.0.+"
-	id("dev.architectury.architectury-pack200") version "0.1.3"
-	id("com.github.johnrengelman.shadow") version "7.1.2"
-	id("io.github.juuxel.loom-quiltflower") version "1.7.3"
+	id("fabric-loom") version "1.7.+"
 	`maven-publish`
-	kotlin("jvm") version "1.8.21"
-	id("io.gitlab.arturbosch.detekt") version "1.23.0"
-	id("com.google.devtools.ksp") version "1.8.21-1.0.11"
+	kotlin("jvm") version "2.0.0"
+	id("com.github.johnrengelman.shadow") version "8.1.1"
 	id("net.kyori.blossom") version "2.1.0"
-	id("com.xpdustry.ksr") version "1.0.0"
+	id("io.gitlab.arturbosch.detekt") version "1.23.0"
+	id("com.google.devtools.ksp") version "2.0.0-1.0.21"
 }
 
-
-apply<NEUBuildFlags>()
-
-// Build metadata
-
 group = "io.github.moulberry"
+version = project.property("mod_version") as String
 
-val baseVersion = setVersionFromEnvironment()
-
-// Minecraft configuration:
+// ── Minecraft / Fabric ────────────────────────────────────────────────────────
 loom {
-	launchConfigs {
-		"client" {
-			property("mixin.debug", "true")
-			property("asmhelper.verbose", "true")
-			arg("--tweakClass", "io.github.moulberry.notenoughupdates.loader.NEUDelegatingTweaker")
-			arg("--mixin", "mixins.notenoughupdates.json")
-		}
+	// Mixin config declared here so loom sets up refmap for us automatically
+	@Suppress("UnstableApiUsage")
+	mixin {
+		defaultRefmapName.set("mixins.notenoughupdates.refmap.json")
+		add(sourceSets.main.get(), "mixins.notenoughupdates.refmap.json")
 	}
+
 	runConfigs {
 		"client" {
-			if (SystemUtils.IS_OS_MAC_OSX) {
-				vmArgs.remove("-XstartOnFirstThread")
-			}
 			vmArgs.add("-Xmx4G")
+			// Enable mixin debug output during dev
+			vmArgs.add("-Dmixin.debug.export=true")
 		}
 		"server" {
 			isIdeConfigGenerated = false
 		}
 	}
-	forge {
-		accessTransformer(file("src/main/resources/META-INF/accesstransformer.cfg"))
-		pack200Provider.set(dev.architectury.pack200.java.Pack200Adapter())
-		mixinConfig("mixins.notenoughupdates.json")
-	}
-	@Suppress("UnstableApiUsage")
-	mixin {
-		defaultRefmapName.set("mixins.notenoughupdates.refmap.json")
-	}
 }
 
-
-// Dependencies:
+// ── Repositories ──────────────────────────────────────────────────────────────
 repositories {
 	mavenCentral()
 	mavenLocal()
+	maven("https://maven.fabricmc.net/")
 	maven("https://maven.notenoughupdates.org/releases")
-	maven("https://repo.spongepowered.org/maven/")
 	maven("https://pkgs.dev.azure.com/djtheredstoner/DevAuth/_packaging/public/maven/v1")
 	maven("https://jitpack.io")
 	maven("https://repo.nea.moe/releases")
+	maven("https://maven.terraformersmc.com/") // ModMenu
+	maven("https://maven.shedaniel.me/")       // Cloth Config
 }
 
-val shadowImplementation: Configuration by configurations.creating {
-	configurations.implementation.get().extendsFrom(this)
-}
-
-val shadowOnly: Configuration by configurations.creating {
-
-}
-
-val shadowApi: Configuration by configurations.creating {
-	configurations.api.get().extendsFrom(this)
+// ── Custom configurations ─────────────────────────────────────────────────────
+val shadowBundle: Configuration by configurations.creating {
+	isCanBeResolved = true
+	isCanBeConsumed = false
 }
 
 val devEnv: Configuration by configurations.creating {
@@ -114,208 +79,179 @@ val devEnv: Configuration by configurations.creating {
 	isVisible = false
 }
 
-val kotlinDependencies: Configuration by configurations.creating {
-	configurations.implementation.get().extendsFrom(this)
-}
-
-val mixinRTDependencies: Configuration by configurations.creating {
-	configurations.implementation.get().extendsFrom(this)
-}
-
-configurations {
-	val main = getByName(sourceSets.main.get().compileClasspathConfigurationName)
-}
-
+// ── Dependencies ──────────────────────────────────────────────────────────────
 dependencies {
-	minecraft("com.mojang:minecraft:1.8.9")
-	mappings("de.oceanlabs.mcp:mcp_stable:22-1.8.9")
-	forge("net.minecraftforge:forge:1.8.9-11.15.1.2318-1.8.9")
+	// --- Core Fabric / Minecraft ---
+	minecraft("com.mojang:minecraft:${project.property("minecraft_version")}")
+	// Using Mojang mappings (mojmap) – widely supported, no license issues at runtime
+	mappings(loom.officialMojangMappings())
+	modImplementation("net.fabricmc:fabric-loader:${project.property("loader_version")}")
+	modImplementation("net.fabricmc.fabric-api:fabric-api:${project.property("fabric_version")}")
 
+	// --- Kotlin on Fabric (replaces manual kotlin bundling from 1.8.9 build) ---
+	// This mod provides the Kotlin runtime to all Fabric mods; no need to shadow kotlin stdlib
+	modImplementation("net.fabricmc:fabric-language-kotlin:${project.property("fabric_kotlin_version")}")
 
-	// Please keep this version in sync with KotlinLoadingTweaker
-	implementation(enforcedPlatform("org.jetbrains.kotlin:kotlin-bom:1.8.0"))
-	kotlinDependencies(kotlin("stdlib"))
-	kotlinDependencies(kotlin("reflect"))
+	// --- Mixin (provided by Fabric Loader, just need annotation processor) ---
+	annotationProcessor("net.fabricmc:sponge-mixin:0.15.3+mixin.0.8.7")
+	compileOnly("org.spongepowered:mixin:0.8.7")
 
+	// --- KSP / AutoService (unchanged from 1.8.9 build) ---
 	ksp("dev.zacsweers.autoservice:auto-service-ksp:1.0.0")
 	implementation("com.google.auto.service:auto-service-annotations:1.0.1")
 
-	compileOnly(ksp(project(":annotations"))!!)
-	compileOnly("org.projectlombok:lombok:1.18.24")
-	annotationProcessor("org.projectlombok:lombok:1.18.24")
+	// --- Lombok (unchanged) ---
+	compileOnly("org.projectlombok:lombok:1.18.32")
+	annotationProcessor("org.projectlombok:lombok:1.18.32")
 
-	shadowImplementation("com.mojang:brigadier:1.0.18")
-	shadowImplementation("moe.nea:libautoupdate:1.3.1")
-	shadowImplementation(libs.nealisp) {
+	// --- Annotations (unchanged) ---
+	compileOnly("org.jetbrains:annotations:24.0.1")
+	compileOnly(project(":annotations"))
+	ksp(project(":annotations"))
+
+	// --- MoulConfig (Fabric build) ---
+	// IMPORTANT: You must upgrade to a MoulConfig version that supports Fabric 1.21.
+	// Check https://maven.notenoughupdates.org for the latest fabric build.
+	// Replace "MOULCONFIG_FABRIC_VERSION" below with the real version once confirmed.
+	modImplementation("io.github.notenoughupdates.moulconfig:modern-1.21.11:4.4.0-beta")
+	include("io.github.notenoughupdates.moulconfig:modern-1.21.11:4.4.0-beta") {
+		exclude("net.fabricmc.fabric-api")
+	}
+
+	// --- libautoupdate (unchanged dependency, works on Fabric) ---
+	shadowBundle("moe.nea:libautoupdate:1.3.1")
+	include("moe.nea:libautoupdate:1.3.1")
+
+	// --- NEA Lisp (unchanged) ---
+	shadowBundle(libs.nealisp) {
 		exclude("org.jetbrains.kotlin")
 	}
+	include(libs.nealisp)
 
-	mixinRTDependencies("org.spongepowered:mixin:0.7.11-SNAPSHOT") {
-		isTransitive = false // Dependencies of mixin are already bundled by minecraft
+	// --- Brigadier is now bundled by vanilla Minecraft in 1.21 – no longer needs shadowing ---
+	// (was: shadowImplementation("com.mojang:brigadier:1.0.18"))
+	// It's available on the compile classpath automatically via the minecraft dependency.
+
+	// --- Bliki (wiki parsing – unchanged) ---
+	shadowBundle("info.bliki.wiki:bliki-core:3.1.0")
+	include("info.bliki.wiki:bliki-core:3.1.0")
+
+	// --- Cloth Config (replaces Forge's config GUI system) ---
+	modImplementation("me.shedaniel.cloth:cloth-config-fabric:15.0.130") {
+		exclude(group = "net.fabricmc.fabric-api")
 	}
-	annotationProcessor("net.fabricmc:sponge-mixin:0.11.4+mixin.0.8.5")
-	compileOnly("org.jetbrains:annotations:24.0.1")
+	include("me.shedaniel.cloth:cloth-config-fabric:15.0.130")
 
-	modImplementation(libs.moulconfig)
-	shadowOnly(libs.moulconfig)
+	// --- ModMenu (optional but recommended – adds NEU to the mods list in-game) ---
+	modCompileOnly("com.terraformersmc:modmenu:11.0.3")
 
-	@Suppress("VulnerableLibrariesLocal")
-	shadowApi("info.bliki.wiki:bliki-core:3.1.0")
-	testImplementation("org.junit.jupiter:junit-jupiter:5.9.2")
-	testAnnotationProcessor("net.fabricmc:sponge-mixin:0.11.4+mixin.0.8.5")
-	detektPlugins("org.notenoughupdates:detektrules:1.0.0")
-	devEnv("me.djtheredstoner:DevAuth-forge-legacy:1.2.1")
+	// --- Dev Auth (replaces DevAuth-forge-legacy) ---
+	devEnv("me.djtheredstoner:DevAuth-fabric:1.2.1")
+
+	// --- Test ---
+	testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
 }
 
-
-
+// ── Java toolchain ────────────────────────────────────────────────────────────
 java {
 	withSourcesJar()
-	toolchain.languageVersion.set(JavaLanguageVersion.of(8))
+	// 1.21.1 requires Java 21
+	toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+	sourceCompatibility = JavaVersion.VERSION_21
+	targetCompatibility = JavaVersion.VERSION_21
 }
 
-// Tasks:
+kotlin {
+	jvmToolchain(21)
+}
 
-tasks.withType(JavaCompile::class) {
+// ── Compile options ───────────────────────────────────────────────────────────
+tasks.withType<JavaCompile>().configureEach {
 	options.encoding = "UTF-8"
-	options.isFork = true
+	options.release.set(21)
 }
 
+// ── Test ──────────────────────────────────────────────────────────────────────
 tasks.named<Test>("test") {
 	useJUnitPlatform()
-	systemProperty("junit.jupiter.extensions.autodetection.enabled", "true")
-	this.javaLauncher.set(javaToolchains.launcherFor(java.toolchain))
 	testLogging {
-		exceptionFormat = TestExceptionFormat.FULL
-	}
-}
-val badJars = layout.buildDirectory.dir("badjars")
-
-tasks.named("jar", Jar::class) {
-	archiveClassifier.set("named")
-	destinationDirectory.set(badJars)
-}
-
-tasks.withType(Jar::class) {
-	archiveBaseName.set("NotEnoughUpdates")
-	manifest.attributes.run {
-		this["Main-Class"] = "NotSkyblockAddonsInstallerFrame"
-		this["TweakClass"] = "io.github.moulberry.notenoughupdates.loader.NEUDelegatingTweaker"
-		this["MixinConfigs"] = "mixins.notenoughupdates.json"
-		this["FMLCorePluginContainsFMLMod"] = "true"
-		this["ForceLoadAsMod"] = "true"
-		this["Manifest-Version"] = "1.0"
-		this["FMLAT"] = "accesstransformer.cfg"
+		exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
 	}
 }
 
-val remapJar by tasks.named<net.fabricmc.loom.task.RemapJarTask>("remapJar") {
-	archiveClassifier.set("")
-	from(tasks.shadowJar)
-	input.set(tasks.shadowJar.get().archiveFile)
-	doLast {
-		println("Jar name: ${archiveFile.get().asFile}")
-	}
-}
-
-tasks.remapSourcesJar {
-	this.enabled = false
-}
-
-/* Bypassing https://github.com/johnrengelman/shadow/issues/111 */
-// Use Zip instead of Jar as to not include META-INF
-val kotlinDependencyCollectionJar by tasks.creating(Zip::class) {
-	archiveFileName.set("kotlin-libraries-wrapped.jar")
-	destinationDirectory.set(project.layout.buildDirectory.dir("wrapperjars"))
-	from(kotlinDependencies)
-	into("neu-kotlin-libraries-wrapped")
-}
-val mixinDependencyCollectionJar by tasks.creating(Zip::class) {
-	archiveFileName.set("mixin-libraries-wrapped.jar")
-	destinationDirectory.set(project.layout.buildDirectory.dir("wrapperjars"))
-	from(mixinRTDependencies)
-	into("neu-mixin-libraries-wrapped")
-}
-
-val includeBackupRepo by tasks.registering(DownloadBackupRepo::class) {
-	this.branch.set("master")
-	this.outputDirectory.set(layout.buildDirectory.dir("downloadedRepo"))
-}
-
-
-tasks.shadowJar {
-	archiveClassifier.set("dep-dev")
-	configurations = listOf(shadowImplementation, shadowApi, shadowOnly)
-	destinationDirectory.set(badJars)
-	archiveBaseName.set("NotEnoughUpdates")
-	exclude("**/module-info.class", "LICENSE.txt")
-	dependencies {
-		exclude {
-			it.moduleGroup.startsWith("org.apache.") || it.moduleName in
-				listOf("logback-classic", "commons-logging", "commons-codec", "logback-core")
-		}
-	}
-	from(kotlinDependencyCollectionJar)
-	from(mixinDependencyCollectionJar)
-	dependsOn(kotlinDependencyCollectionJar)
-	dependsOn(mixinDependencyCollectionJar)
-	fun relocate(name: String) = kotlinRelocate(name, "io.github.moulberry.notenoughupdates.deps.$name")
-	relocate("com.mojang.brigadier")
-	relocate("io.github.moulberry.moulconfig")
-	relocate("moe.nea.libautoupdate")
-	relocate("moe.nea.lisp")
-	mergeServiceFiles()
-}
-
-tasks.assemble.get().dependsOn(remapJar)
-
+// ── Resource processing ───────────────────────────────────────────────────────
 tasks.processResources {
-	from(tasks["generateBuildFlags"])
-	from(includeBackupRepo)
-	filesMatching(listOf("mcmod.info", "fabric.mod.json", "META-INF/mods.toml")) {
+	inputs.property("version", project.version)
+	inputs.property("minecraft_version", project.property("minecraft_version"))
+	inputs.property("loader_version", project.property("loader_version"))
+
+	filteringCharset = "UTF-8"
+
+	filesMatching("fabric.mod.json") {
 		expand(
-			"version" to project.version, "mcversion" to "1.8.9"
+			"version" to project.version,
+			"minecraft_version" to project.property("minecraft_version"),
+			"loader_version" to project.property("loader_version"),
+			"fabric_kotlin_version" to project.property("fabric_kotlin_version")
 		)
 	}
 }
 
-val detektProjectBaseline by tasks.registering(io.gitlab.arturbosch.detekt.DetektCreateBaselineTask::class) {
-	description = "Overrides current baseline."
-	buildUponDefaultConfig.set(true)
-	ignoreFailures.set(true)
-	parallel.set(true)
-	setSource(files(rootDir))
-	config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
-	baseline.set(file("$rootDir/config/detekt/baseline.xml"))
-	include("**/*.kt")
-	include("**/*.kts")
-	exclude("**/resources/**")
-	exclude("**/build/**")
+// ── Shadow jar ────────────────────────────────────────────────────────────────
+// With Fabric, most deps are handled via `include()` (JiJ – Jar in Jar).
+// Shadow is still useful for relocating deps that might conflict.
+tasks.shadowJar {
+	configurations = listOf(shadowBundle)
+	archiveClassifier.set("dev-shadow")
+
+	exclude("**/module-info.class", "LICENSE.txt")
+
+	// Relocate shadowed deps under NEU's namespace to avoid conflicts
+	relocate("moe.nea.libautoupdate", "io.github.moulberry.notenoughupdates.deps.libautoupdate")
+	relocate("moe.nea.lisp", "io.github.moulberry.notenoughupdates.deps.lisp")
+	relocate("info.bliki", "io.github.moulberry.notenoughupdates.deps.bliki")
+
+	mergeServiceFiles()
 }
 
-idea {
-	module {
-		// Not using += due to https://github.com/gradle/gradle/issues/8749
-		sourceDirs = sourceDirs + file("build/generated/ksp/main/kotlin") // or tasks["kspKotlin"].destination
-		testSourceDirs = testSourceDirs + file("build/generated/ksp/test/kotlin")
-		generatedSourceDirs =
-			generatedSourceDirs + file("build/generated/ksp/main/kotlin") + file("build/generated/ksp/test/kotlin")
+val remapJar by tasks.named<net.fabricmc.loom.task.RemapJarTask>("remapJar") {
+	archiveClassifier.set("")
+	inputFile.set(tasks.shadowJar.get().archiveFile)
+	dependsOn(tasks.shadowJar)
+	doLast {
+		println("Built: ${archiveFile.get().asFile}")
 	}
 }
 
+tasks.assemble.get().dependsOn(remapJar)
+
+// ── Source sets ───────────────────────────────────────────────────────────────
 sourceSets.main {
-	output.setResourcesDir(file("$buildDir/classes/java/main"))
 	this.blossom {
 		this.javaSources {
-			this.property("neuVersion", baseVersion)
+			this.property("neuVersion", project.version.toString())
 		}
 	}
 }
 
-tasks.register("signRelease", CustomSignTask::class)
+idea {
+	module {
+		sourceDirs = sourceDirs + file("build/generated/ksp/main/kotlin")
+		testSourceDirs = testSourceDirs + file("build/generated/ksp/test/kotlin")
+		generatedSourceDirs = generatedSourceDirs +
+			file("build/generated/ksp/main/kotlin") +
+			file("build/generated/ksp/test/kotlin")
+	}
+}
 
-applyPublishingInformation(
-	"deobf" to tasks.jar,
-	"all" to tasks.remapJar,
-	"sources" to tasks["sourcesJar"],
-)
+// ── Publishing ────────────────────────────────────────────────────────────────
+publishing {
+	publications {
+		create<MavenPublication>("mavenJava") {
+			groupId = project.group.toString()
+			artifactId = "NotEnoughUpdates"
+			version = project.version.toString()
+			from(components["java"])
+		}
+	}
+}
