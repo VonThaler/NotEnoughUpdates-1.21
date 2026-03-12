@@ -25,7 +25,7 @@ plugins {
 	kotlin("jvm") version "2.0.0"
 	id("com.github.johnrengelman.shadow") version "8.1.1"
 	id("net.kyori.blossom") version "2.1.0"
-	id("io.gitlab.arturbosch.detekt") version "1.23.0"
+	id("io.gitlab.arturbosch.detekt") version "1.23.6"
 	id("com.google.devtools.ksp") version "2.0.0-1.0.21"
 }
 
@@ -64,6 +64,7 @@ repositories {
 	maven("https://repo.nea.moe/releases")
 	maven("https://maven.terraformersmc.com/") // ModMenu
 	maven("https://maven.shedaniel.me/")       // Cloth Config
+	//maven("https://repo.spongepowered.org/repository/maven-releases")     // Mixin
 }
 
 // ── Custom configurations ─────────────────────────────────────────────────────
@@ -113,8 +114,8 @@ dependencies {
 	// IMPORTANT: You must upgrade to a MoulConfig version that supports Fabric 1.21.
 	// Check https://maven.notenoughupdates.org for the latest fabric build.
 	// Replace "MOULCONFIG_FABRIC_VERSION" below with the real version once confirmed.
-	modImplementation("io.github.notenoughupdates.moulconfig:modern-1.21.11:4.4.0-beta")
-	include("io.github.notenoughupdates.moulconfig:modern-1.21.11:4.4.0-beta") {
+	modImplementation("org.notenoughupdates.moulconfig:modern-1.21.11:4.4.0-beta")
+	include("org.notenoughupdates.moulconfig:modern-1.21.11:4.4.0-beta") {
 		exclude("net.fabricmc.fabric-api")
 	}
 
