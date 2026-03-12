@@ -64,7 +64,7 @@ repositories {
 	maven("https://repo.nea.moe/releases")
 	maven("https://maven.terraformersmc.com/") // ModMenu
 	maven("https://maven.shedaniel.me/")       // Cloth Config
-	//maven("https://repo.spongepowered.org/repository/maven-releases")     // Mixin
+	maven("https://repo.spongepowered.org/repository/maven-public")     // Mixin
 }
 
 // ── Custom configurations ─────────────────────────────────────────────────────
