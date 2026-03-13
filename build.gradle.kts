@@ -20,7 +20,7 @@
 plugins {
 	idea
 	java
-	id("fabric-loom") version "1.7.+"
+	id("fabric-loom") version "1.8.+"
 	`maven-publish`
 	kotlin("jvm") version "2.0.0"
 	id("com.github.johnrengelman.shadow") version "8.1.1"
@@ -87,7 +87,7 @@ dependencies {
 	// Using Mojang mappings (mojmap) – widely supported, no license issues at runtime
 	mappings(loom.officialMojangMappings())
 	modImplementation("net.fabricmc:fabric-loader:${project.property("loader_version")}")
-	modImplementation("net.fabricmc.fabric-api:fabric-api:${project.property("fabric_version")}")
+	modImplementation("net.fabricmc.fabric-api:fabric-api:${project.property("fabric_api_version")}")
 
 	// --- Kotlin on Fabric (replaces manual kotlin bundling from 1.8.9 build) ---
 	// This mod provides the Kotlin runtime to all Fabric mods; no need to shadow kotlin stdlib
@@ -156,7 +156,7 @@ dependencies {
 // ── Java toolchain ────────────────────────────────────────────────────────────
 java {
 	withSourcesJar()
-	// 1.21.1 requires Java 21
+
 	toolchain.languageVersion.set(JavaLanguageVersion.of(21))
 	sourceCompatibility = JavaVersion.VERSION_21
 	targetCompatibility = JavaVersion.VERSION_21
@@ -237,8 +237,6 @@ sourceSets.main {
 
 idea {
 	module {
-		sourceDirs = sourceDirs + file("build/generated/ksp/main/kotlin")
-		testSourceDirs = testSourceDirs + file("build/generated/ksp/test/kotlin")
 		generatedSourceDirs = generatedSourceDirs +
 			file("build/generated/ksp/main/kotlin") +
 			file("build/generated/ksp/test/kotlin")

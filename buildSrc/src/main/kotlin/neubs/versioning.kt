@@ -25,7 +25,7 @@ import java.io.ByteArrayOutputStream
 fun Project.setVersionFromEnvironment(): String {
     val baseVersion = run {
         val baos = ByteArrayOutputStream()
-        exec {
+        providers.exec {
             commandLine("git", "describe", "--tags", "--abbrev=0")
             standardOutput = baos
             isIgnoreExitValue = true
@@ -38,22 +38,22 @@ fun Project.setVersionFromEnvironment(): String {
     if (System.getenv("CI") == "true" && System.getenv("NEU_RELEASE") != "true") buildExtra.add("ci")
 
     val stdout = ByteArrayOutputStream()
-    val execResult = exec {
+    val execResult = providers.exec {
         commandLine("git", "rev-parse", "--short", "HEAD")
         standardOutput = stdout
         isIgnoreExitValue = true
     }
-    if (execResult.exitValue == 0) {
+    if (execResult.result.get().exitValue == 0) {
         buildExtra.add(String(stdout.toByteArray()).trim())
     }
 
     val gitDiffStdout = ByteArrayOutputStream()
-    val gitDiffResult = exec {
+    val gitDiffResult = providers.exec {
         commandLine("git", "status", "--porcelain")
         standardOutput = gitDiffStdout
         isIgnoreExitValue = true
     }
-    if (gitDiffResult.exitValue == 0 && gitDiffStdout.toByteArray().isNotEmpty()) {
+    if (gitDiffResult.result.get().exitValue == 0 && gitDiffStdout.toByteArray().isNotEmpty()) {
         buildExtra.add("dirty")
     }
 
