@@ -20,7 +20,7 @@
 plugins {
 	idea
 	java
-	id("fabric-loom") version "1.8.+"
+	id("fabric-loom") version "1.14.0"
 	`maven-publish`
 	kotlin("jvm") version "2.0.0"
 	id("com.github.johnrengelman.shadow") version "8.1.1"
@@ -191,9 +191,9 @@ tasks.processResources {
 	filesMatching("fabric.mod.json") {
 		expand(
 			"version" to project.version,
-			"minecraft_version" to project.property("minecraft_version"),
-			"loader_version" to project.property("loader_version"),
-			"fabric_kotlin_version" to project.property("fabric_kotlin_version")
+			"minecraft_version" to project.property("minecraft_version")!!,
+			"loader_version" to project.property("loader_version")!!,
+			"fabric_kotlin_version" to project.property("fabric_kotlin_version")!!
 		)
 	}
 }

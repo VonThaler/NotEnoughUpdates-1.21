@@ -13,7 +13,7 @@ pluginManagement {
 	repositories {
 		mavenCentral()
 		gradlePluginPortal()
-		maven("https://maven.fabricmc.net/")              // fabric-loom
+		maven("https://maven.fabricmc.net/")
 		maven("https://maven.architectury.dev/")
 		maven("https://oss.sonatype.org/content/repositories/snapshots")
 		maven("https://jitpack.io/")
