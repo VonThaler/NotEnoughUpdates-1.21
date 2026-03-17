@@ -20,7 +20,7 @@
 plugins {
 	idea
 	java
-	id("fabric-loom") version "1.14.0"
+	id("fabric-loom") version "1.14.7"
 	`maven-publish`
 	kotlin("jvm") version "2.0.0"
 	id("com.github.johnrengelman.shadow") version "8.1.1"
@@ -171,6 +171,7 @@ tasks.withType<JavaCompile>().configureEach {
 	options.encoding = "UTF-8"
 	options.release.set(21)
 }
+
 
 // ── Test ──────────────────────────────────────────────────────────────────────
 tasks.named<Test>("test") {
