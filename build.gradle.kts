@@ -20,7 +20,7 @@
 plugins {
 	idea
 	java
-	id("fabric-loom") version "1.7.+"
+	id("fabric-loom") version "1.14.7"
 	`maven-publish`
 	kotlin("jvm") version "2.0.0"
 	id("com.github.johnrengelman.shadow") version "8.1.1"
@@ -64,7 +64,7 @@ repositories {
 	maven("https://repo.nea.moe/releases")
 	maven("https://maven.terraformersmc.com/") // ModMenu
 	maven("https://maven.shedaniel.me/")       // Cloth Config
-	//maven("https://repo.spongepowered.org/repository/maven-releases")     // Mixin
+	maven("https://repo.spongepowered.org/repository/maven-public")     // Mixin
 }
 
 // ── Custom configurations ─────────────────────────────────────────────────────
@@ -87,7 +87,7 @@ dependencies {
 	// Using Mojang mappings (mojmap) – widely supported, no license issues at runtime
 	mappings(loom.officialMojangMappings())
 	modImplementation("net.fabricmc:fabric-loader:${project.property("loader_version")}")
-	modImplementation("net.fabricmc.fabric-api:fabric-api:${project.property("fabric_version")}")
+	modImplementation("net.fabricmc.fabric-api:fabric-api:${project.property("fabric_api_version")}")
 
 	// --- Kotlin on Fabric (replaces manual kotlin bundling from 1.8.9 build) ---
 	// This mod provides the Kotlin runtime to all Fabric mods; no need to shadow kotlin stdlib
@@ -156,7 +156,7 @@ dependencies {
 // ── Java toolchain ────────────────────────────────────────────────────────────
 java {
 	withSourcesJar()
-	// 1.21.1 requires Java 21
+
 	toolchain.languageVersion.set(JavaLanguageVersion.of(21))
 	sourceCompatibility = JavaVersion.VERSION_21
 	targetCompatibility = JavaVersion.VERSION_21
@@ -171,6 +171,7 @@ tasks.withType<JavaCompile>().configureEach {
 	options.encoding = "UTF-8"
 	options.release.set(21)
 }
+
 
 // ── Test ──────────────────────────────────────────────────────────────────────
 tasks.named<Test>("test") {
@@ -191,9 +192,9 @@ tasks.processResources {
 	filesMatching("fabric.mod.json") {
 		expand(
 			"version" to project.version,
-			"minecraft_version" to project.property("minecraft_version"),
-			"loader_version" to project.property("loader_version"),
-			"fabric_kotlin_version" to project.property("fabric_kotlin_version")
+			"minecraft_version" to project.property("minecraft_version")!!,
+			"loader_version" to project.property("loader_version")!!,
+			"fabric_kotlin_version" to project.property("fabric_kotlin_version")!!
 		)
 	}
 }
@@ -237,8 +238,6 @@ sourceSets.main {
 
 idea {
 	module {
-		sourceDirs = sourceDirs + file("build/generated/ksp/main/kotlin")
-		testSourceDirs = testSourceDirs + file("build/generated/ksp/test/kotlin")
 		generatedSourceDirs = generatedSourceDirs +
 			file("build/generated/ksp/main/kotlin") +
 			file("build/generated/ksp/test/kotlin")
